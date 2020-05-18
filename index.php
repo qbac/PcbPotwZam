@@ -1,7 +1,7 @@
 <?php
 
 include_once('config.php');
-include_once('getPotw.php');
+include_once('OrdersFromCustomersConfirmation_model.php');
 
 try {
     $conn = new PDO("firebird:host=".SERVER_FB.";dbname=".DATABASE_FB.";charset=UTF8", USER_DB_FB, PASS_DB_FB);
@@ -10,6 +10,11 @@ try {
 	//$conn -> query ('SET NAMES WIN1250');
 	//$conn -> query ('SET CHARACTER_SET WIN1250');
     echo "<p>Connected successfully</p>";
+
+    $confirmationOrders = new OrdersFromCustomers();
+    $confirmationOrders->conn = $conn;
+    $confirmationOrders->checkToConfirmedAndGenXML();
+
     }
 catch(PDOException $e)
     {
