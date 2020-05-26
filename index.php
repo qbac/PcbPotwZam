@@ -9,16 +9,18 @@ try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 	//$conn -> query ('SET NAMES WIN1250');
 	//$conn -> query ('SET CHARACTER_SET WIN1250');
-    echo "<p>Connected successfully</p>";
+    //echo "<p>Connected successfully</p>";
 
     $confirmationOrders = new OrdersFromCustomers();
     $confirmationOrders->conn = $conn;
+    //echo "<br><br>";
     $confirmationOrders->checkToConfirmedAndGenXML();
+    //var_dump($confirmationOrders->data);
 
     }
 catch(PDOException $e)
     {
-    echo "<p>Connection failed: " . $e->getMessage."</p>"();
+    //echo "<p>Connection failed: " . $e->getMessage."</p>"();
     }
 
 ?>
