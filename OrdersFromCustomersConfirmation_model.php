@@ -2,12 +2,14 @@
 
 class OrdersFromCustomers {
     
-    private $idCechaNaglConfirm = 10019; //id header attributes Orders from recipients
+    private $idCechaNaglConfirm = ID_CECHA_NAGL_CONFIRM; //id header attributes Orders from recipients
     private $idGrupaDok = 80; // Group Orders from recipients
-    private $toConfirmation = 'Do potwierdzenia';
+    private $toConfirmation = VALUE_CHECHA_NAGL_TO_CONFIRM;
+    private $idPriorytetConfirmation = ID_NAGL_PRIORYTET_TO_CONFIRM;
+    private $idKontrahToConfirm = ID_KONTRAH_TO_CONFIRM;
     private $totalLines = 0;
     private $lpPozConfirmed = '';
-    public $locationXmlFile = "xml/";
+    public $locationXmlFile = LOCATION_XML_FILES ;
     //public $data = array();
     public $XmlData;
     public $conn = '';
@@ -89,7 +91,8 @@ class OrdersFromCustomers {
         WHERE
         WC.id_cechadokk = {$this->idCechaNaglConfirm} 
         AND NA.id_grupadok = {$this->idGrupaDok}
-        AND ((WC.wartosc = '{$this->toConfirmation}') OR (ND.ID_NAGL_PRIORYTET = 5))
+        AND NA.ID_KONTRAH = {$this->idKontrahToConfirm}
+        AND ((WC.wartosc = '{$this->toConfirmation}') OR (ND.ID_NAGL_PRIORYTET = {$this->idPriorytetConfirmation}))
         AND NA.status = 0";
         
         $stmt = $this->conn->prepare($query);
