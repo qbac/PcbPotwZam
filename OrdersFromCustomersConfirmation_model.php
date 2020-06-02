@@ -9,10 +9,11 @@ class OrdersFromCustomers {
     private $idKontrahToConfirm = ID_KONTRAH_TO_CONFIRM;
     private $totalLines = 0;
     private $lpPozConfirmed = '';
+    private $nrDokWew ='';
     public $locationXmlFile = LOCATION_XML_FILES ;
     //public $data = array();
     public $XmlData;
-    public $conn = '';
+    public $conn ;
 
     public function getHeaderOrder($idNagl) {
         $query = "SELECT NRDOKWEW, cast('Now' as date) as OrderResponseDate, NAPODSTAWIE, CAST(DATADOK as date) as DATADOK FROM nagl
@@ -20,7 +21,7 @@ class OrdersFromCustomers {
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+        $this->nrDokWew = $result[0]['NRDOKWEW'];
         $data['OrderResponse-Header']['OrderResponseType'] = '231';
         $data['OrderResponse-Header']['OrderResponseNumber'] = $result[0]['NRDOKWEW'];
         $data['OrderResponse-Header']['OrderResponseDate'] = $result[0]['ORDERRESPONSEDATE'];
@@ -103,7 +104,7 @@ class OrdersFromCustomers {
 
     private function getPositionToConfirmed ($idNagl) {
 
-    $query = "SELECT p.lp, k.indeks, p.kart_nazwadl, p.ilosc, p.jm, p.cenanetto, CAST(pzs.termindost as date) as termindost, pzs.datawysylki FROM poz p
+    $query = "SELECT p.lp, k.indeks, p.kart_nazwadl, p.ilosc, p.jm, p.cenanetto, CAST(pzs.termindost as date) as termindost, pzs.datawysylki, p.id_poz FROM poz p
     INNER join pozzamwsp pzs ON p.id_poz = pzs.id_poz
     INNER join kartoteka k ON p.id_kartoteka = k.id_kartoteka
     where
@@ -122,11 +123,16 @@ class OrdersFromCustomers {
             $data['OrderResponse-Lines']['Line']['Line-Item']['SupplierItemCode'] = $value["INDEKS"];
             $data['OrderResponse-Lines']['Line']['Line-Item']['OrderedQuantity'] = $value["ILOSC"];
             $data['OrderResponse-Lines']['Line']['Line-Item']['QuantityToBeDelivered'] = $value["ILOSC"];
-            $data['OrderResponse-Lines']['Line']['Line-Item']['UnitOfMeasure'] = $value["JM"];
+            $data['OrderResponse-Lines']['Line']['Line-Item']['UnitOfMeasure'] = Schema::$jm[$value["JM"]];
             $data['OrderResponse-Lines']['Line']['Line-Item']['OrderedUnitNetPrice'] = $value["CENANETTO"];
             $data['OrderResponse-Lines']['Line']['Line-Item']['ExpectedDeliveryDate'] = $value["TERMINDOST"];
             $this->addToXmlData($data, $this->XmlData);
             $this->lpPozConfirmed = $this->lpPozConfirmed.' '.$value["LP"];
+            
+                $query = "UPDATE pozzamwsp pzs SET pzs.datawysylki = '{$value["TERMINDOST"]}' WHERE pzs.id_poz={$value["ID_POZ"]}";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute();
+
             $data = array();
             $this->totalLines++;
         }
@@ -141,14 +147,26 @@ class OrdersFromCustomers {
         $data = array();
     }
 
-    private function setStatusConfirmed () {
-
+    private function setStatusConfirmed ($idNagl) {
+        $query = "UPDATE WYSTCECHNAGL W Set W.WARTOSC = 'Potwierdzone'
+        Where (W.Id_Nagl = {$idNagl}) and (W.Id_CechaDokK = {$this->idCechaNaglConfirm})";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $query = "UPDATE NAGLDANE N Set ID_NAGL_PRIORYTET = 0
+        Where (N.Id_Nagl = {$idNagl})";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
     }
 
-    private function setLogConfirmed ($idNagl, $idTresc) {
-        $tresc[0]='Poprawnie wygenerowano potwierdzenie zamówienia';
-        $tresc[1]='Błąd. Nie można wygenerować potwierdzenia zamówienia. Brak pozycji do potwierdzenia';
-        $query = "EXECUTE PROCEDURE rejestroper_add(136,1,{$idNagl},'{$tresc[$idTresc]}')";       
+    private function setLogConfirmed ($idNagl, $idTresc, $trescLog = '') {
+        $tresc[1]='Poprawnie wygenerowano potwierdzenie zamówienia';
+        $tresc[2]='Błąd. Nie można wygenerować potwierdzenia zamówienia.';
+        if ($idTresc == 0) {
+            $query = "EXECUTE PROCEDURE rejestroper_add(136,1,{$idNagl},'{$trescLog}')";
+        }else {
+            $tr = $tresc[$idTresc].' '.$trescLog;
+            $query = "EXECUTE PROCEDURE rejestroper_add(136,1,{$idNagl},'{$tr}')";
+        }       
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
     }
@@ -167,8 +185,12 @@ class OrdersFromCustomers {
          }
     }
     private function generateXmlFile($idNagl) {
-
-        $this->XmlData->asXML($this->locationXmlFile.''.$idNagl.'.xml');
+        $mydate=getdate();
+        $md = date("Y-m-d_H-i");
+        $nrdok = str_replace("/","-",$this->nrDokWew);
+        $fileName = $idNagl."_".$nrdok."_".$md.'.xml';
+        $this->XmlData->asXML($this->locationXmlFile.''.$fileName);
+        return $fileName;
     }
 
     public function checkToConfirmedAndGenXML () {
@@ -185,15 +207,20 @@ class OrdersFromCustomers {
                 $this->getPositionToConfirmed($value["ID_NAGL"]);
                 $this->getTotalLines($this->totalLines);
                 if ($this->totalLines > 0) {
-                    $this->generateXmlFile($value["ID_NAGL"]);
-                    
-                } else {$this->setLogConfirmed($value["ID_NAGL"],1);}
+                    $fileName = $this->generateXmlFile($value["ID_NAGL"]);
+                    $this->setLogConfirmed($value["ID_NAGL"],1, "Lp: ".$this->lpPozConfirmed." Plik: ".$fileName);
+                    $this->setStatusConfirmed($value["ID_NAGL"]);
+                } else {
+                    $this->setLogConfirmed($value["ID_NAGL"],2,'Brak pozycji do potwierdzenia');
+                    $this->setStatusConfirmed($value["ID_NAGL"]);
+                }
                 //$this->setStatusConfirmed();
                 //$this->setLogConfirmed();
                 //return $r;
                 $this->XmlData = null;
                 $this->totalLines = 0;
                 $this->lpPozConfirmed = '';
+                $this->nrDokWew = '';
             }
         }
     }
