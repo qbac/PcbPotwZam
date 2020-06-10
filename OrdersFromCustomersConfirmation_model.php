@@ -11,7 +11,7 @@ class OrdersFromCustomers {
     private $lpPozConfirmed = '';
     private $nrDokWew ='';
     public $locationXmlFile = LOCATION_XML_FILES ;
-    //public $data = array();
+    public $data = array();
     public $XmlData;
     public $conn ;
 
@@ -22,13 +22,13 @@ class OrdersFromCustomers {
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $this->nrDokWew = $result[0]['NRDOKWEW'];
-        $data['OrderResponse-Header']['OrderResponseType'] = '231';
-        $data['OrderResponse-Header']['OrderResponseNumber'] = $result[0]['NRDOKWEW'];
-        $data['OrderResponse-Header']['OrderResponseDate'] = $result[0]['ORDERRESPONSEDATE'];
-        $data['OrderResponse-Header']['OrderNumber'] = $result[0]['NAPODSTAWIE'];
-        $data['OrderResponse-Header']['OrderDate'] = $result[0]['DATADOK'];
-        $data['OrderResponse-Header']['DocumentFunctionCode'] = 'O';
-        $this->addToXmlData($data, $this->XmlData);
+        $this->data['OrderResponse-Header']['OrderResponseType'] = '231';
+        $this->data['OrderResponse-Header']['OrderResponseNumber'] = $result[0]['NRDOKWEW'];
+        $this->data['OrderResponse-Header']['OrderResponseDate'] = $result[0]['ORDERRESPONSEDATE'];
+        $this->data['OrderResponse-Header']['OrderNumber'] = $result[0]['NAPODSTAWIE'];
+        $this->data['OrderResponse-Header']['OrderDate'] = $result[0]['DATADOK'];
+        $this->data['OrderResponse-Header']['DocumentFunctionCode'] = 'O';
+        //$this->addToXmlData($data, $this->XmlData);
 
     }
 
@@ -43,17 +43,17 @@ class OrdersFromCustomers {
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $data['OrderResponse-Parties']['Buyer']['ILN'] = $result[0]['GLOBALNRLOKALIZ'];
-        $data['OrderResponse-Parties']['Buyer']['PartyName'] = $result[0]['NAZWADL'];
+        $this->data['OrderResponse-Parties']['Buyer']['ILN'] = $result[0]['GLOBALNRLOKALIZ'];
+        $this->data['OrderResponse-Parties']['Buyer']['PartyName'] = $result[0]['NAZWADL'];
         if ($result[0]['NRLOKALU']) {
-            $data['OrderResponse-Parties']['Buyer']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'].'/'.$result[0]['NRLOKALU'];
+            $this->data['OrderResponse-Parties']['Buyer']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'].'/'.$result[0]['NRLOKALU'];
         } else {
-            $data['OrderResponse-Parties']['Buyer']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'];
+            $this->data['OrderResponse-Parties']['Buyer']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'];
         }
-        $data['OrderResponse-Parties']['Buyer']['CityName'] = $result[0]['MIEJSCOWOSC'];
-        $data['OrderResponse-Parties']['Buyer']['PostCode'] = $result[0]['KODPOCZTOWY'];
-        $data['OrderResponse-Parties']['Buyer']['Country'] = $result[0]['KODKRAJU'];
-        $this->addToXmlData($data, $this->XmlData);
+        $this->data['OrderResponse-Parties']['Buyer']['CityName'] = $result[0]['MIEJSCOWOSC'];
+        $this->data['OrderResponse-Parties']['Buyer']['PostCode'] = $result[0]['KODPOCZTOWY'];
+        $this->data['OrderResponse-Parties']['Buyer']['Country'] = $result[0]['KODKRAJU'];
+        //$this->addToXmlData($data, $this->XmlData);
     }
 
     public function getSeller() {
@@ -65,17 +65,17 @@ class OrdersFromCustomers {
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $data['OrderResponse-Parties']['Seller']['ILN'] = $result[0]['GLOBALNRLOKALIZ'];
-        $data['OrderResponse-Parties']['Seller']['PartyName'] = $result[0]['NAZWA_FIRMY'];
+        $this->data['OrderResponse-Parties']['Seller']['ILN'] = $result[0]['GLOBALNRLOKALIZ'];
+        $this->data['OrderResponse-Parties']['Seller']['PartyName'] = $result[0]['NAZWA_FIRMY'];
         if ($result[0]['NRLOKALU']) {
-            $data['OrderResponse-Parties']['Seller']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'].'/'.$result[0]['NRLOKALU'];
+            $this->data['OrderResponse-Parties']['Seller']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'].'/'.$result[0]['NRLOKALU'];
         } else {
-            $data['OrderResponse-Parties']['Seller']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'];
+            $this->data['OrderResponse-Parties']['Seller']['StreetAndNumber'] = $result[0]['ULICA'].' '.$result[0]['NRDOMU'];
         }
-        $data['OrderResponse-Parties']['Seller']['CityName'] = $result[0]['MIEJSCOWOSC'];
-        $data['OrderResponse-Parties']['Seller']['PostCode'] = $result[0]['KODPOCZTOWY'];
-        $data['OrderResponse-Parties']['Seller']['Country'] = $result[0]['KODKRAJU'];
-        $this->addToXmlData($data, $this->XmlData);
+        $this->data['OrderResponse-Parties']['Seller']['CityName'] = $result[0]['MIEJSCOWOSC'];
+        $this->data['OrderResponse-Parties']['Seller']['PostCode'] = $result[0]['KODPOCZTOWY'];
+        $this->data['OrderResponse-Parties']['Seller']['Country'] = $result[0]['KODKRAJU'];
+        $this->addToXmlData($this->data, $this->XmlData);
     }
 
     public function getDeliveryPoint() {
@@ -117,25 +117,37 @@ class OrdersFromCustomers {
     $stmt->execute();
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if ($result) {
+        $data['OrderResponse-Lines']['Line'] = array();    
     foreach ($result as $value)
         {
-            $data['OrderResponse-Lines']['Line']['Line-Item']['LineNumber'] = $value["LP"];
-            $data['OrderResponse-Lines']['Line']['Line-Item']['SupplierItemCode'] = $value["INDEKS"];
-            $data['OrderResponse-Lines']['Line']['Line-Item']['OrderedQuantity'] = $value["ILOSC"];
-            $data['OrderResponse-Lines']['Line']['Line-Item']['QuantityToBeDelivered'] = $value["ILOSC"];
-            $data['OrderResponse-Lines']['Line']['Line-Item']['UnitOfMeasure'] = Schema::$jm[$value["JM"]];
-            $data['OrderResponse-Lines']['Line']['Line-Item']['OrderedUnitNetPrice'] = $value["CENANETTO"];
-            $data['OrderResponse-Lines']['Line']['Line-Item']['ExpectedDeliveryDate'] = $value["TERMINDOST"];
-            $this->addToXmlData($data, $this->XmlData);
+            // $data['OrderResponse-Lines']['Line']['Line-Item']['LineNumber'] = $value["LP"];
+            // $data['OrderResponse-Lines']['Line']['Line-Item']['SupplierItemCode'] = $value["INDEKS"];
+            // $data['OrderResponse-Lines']['Line']['Line-Item']['OrderedQuantity'] = $value["ILOSC"];
+            // $data['OrderResponse-Lines']['Line']['Line-Item']['QuantityToBeDelivered'] = $value["ILOSC"];
+            // $data['OrderResponse-Lines']['Line']['Line-Item']['UnitOfMeasure'] = Schema::$jm[$value["JM"]];
+            // $data['OrderResponse-Lines']['Line']['Line-Item']['OrderedUnitNetPrice'] = $value["CENANETTO"];
+            // $data['OrderResponse-Lines']['Line']['Line-Item']['ExpectedDeliveryDate'] = $value["TERMINDOST"];
+
+            $dataLine['LineNumber'] = $value["LP"];
+            $dataLine['SupplierItemCode'] = $value["INDEKS"];
+            $dataLine['OrderedQuantity'] = $value["ILOSC"];
+            $dataLine['QuantityToBeDelivered'] = $value["ILOSC"];
+            $dataLine['UnitOfMeasure'] = Schema::$jm[$value["JM"]];
+            $dataLine['OrderedUnitNetPrice'] = $value["CENANETTO"];
+            $dataLine['ExpectedDeliveryDate'] = $value["TERMINDOST"];
+            
+            array_push($data['OrderResponse-Lines']['Line'],$dataLine);
             $this->lpPozConfirmed = $this->lpPozConfirmed.' '.$value["LP"];
             
                 $query = "UPDATE pozzamwsp pzs SET pzs.datawysylki = '{$value["TERMINDOST"]}' WHERE pzs.id_poz={$value["ID_POZ"]}";
                 $stmt = $this->conn->prepare($query);
                 $stmt->execute();
 
-            $data = array();
+            //$data = array();
+            $dataLine = array();
             $this->totalLines++;
         }
+        $this->addToXmlData($data, $this->XmlData);
     }
 
     //return $result;
@@ -175,7 +187,7 @@ class OrdersFromCustomers {
         foreach( $data as $key => $value ) {
             if( is_array($value) ) {
                 if( is_numeric($key) ){
-                    $key = 'item'.$key; //dealing with <0/>..<n/> issues
+                    $key = 'Line-Item';
                 }
                 $subnode = $xml_data->addChild($key);
                 $this->addToXmlData($value, $subnode);
@@ -209,7 +221,7 @@ class OrdersFromCustomers {
                 if ($this->totalLines > 0) {
                     $fileName = $this->generateXmlFile($value["ID_NAGL"]);
                     $this->setLogConfirmed($value["ID_NAGL"],1, "Lp: ".$this->lpPozConfirmed." Plik: ".$fileName);
-                    $this->setStatusConfirmed($value["ID_NAGL"]);
+                    //$this->setStatusConfirmed($value["ID_NAGL"]);
                 } else {
                     $this->setLogConfirmed($value["ID_NAGL"],2,'Brak pozycji do potwierdzenia');
                     $this->setStatusConfirmed($value["ID_NAGL"]);

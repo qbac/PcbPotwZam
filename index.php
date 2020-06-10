@@ -2,6 +2,7 @@
 
 include_once('config.php');
 include_once('OrdersFromCustomersConfirmation_model.php');
+include_once('schema.php');
 
 try {
     $conn = new PDO("firebird:host=".SERVER_FB.";dbname=".DATABASE_FB.";charset=UTF8", USER_DB_FB, PASS_DB_FB);
