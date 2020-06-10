@@ -7,6 +7,7 @@ class OrdersFromCustomers {
     private $toConfirmation = VALUE_CHECHA_NAGL_TO_CONFIRM;
     private $idPriorytetConfirmation = ID_NAGL_PRIORYTET_TO_CONFIRM;
     private $idKontrahToConfirm = ID_KONTRAH_TO_CONFIRM;
+    private $ignoreIdKartoteka = IGNORE_ID_KARTOTEKA;
     private $totalLines = 0;
     private $lpPozConfirmed = '';
     private $nrDokWew ='';
@@ -112,6 +113,9 @@ class OrdersFromCustomers {
     AND pzs.termindost is not null
     AND pzs.termindost <> '30.12.1899'
     AND (iif(cast(pzs.termindost as timestamp) <> iif(pzs.datawysylki is null, '30.12.1899',cast(pzs.datawysylki as timestamp)), 1, 0) = 1)";
+    if($this->ignoreIdKartoteka <>''){
+        $query .= " AND p.id_kartoteka not in ({$this->ignoreIdKartoteka})";
+    }
     
     $stmt = $this->conn->prepare($query);
     $stmt->execute();
