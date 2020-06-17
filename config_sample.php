@@ -11,4 +11,5 @@ define('VALUE_CHECHA_NAGL_CONFIRMED','Potwierdzone');
 define('ID_NAGL_PRIORYTET_TO_CONFIRM','5');
 define('ID_KONTRAH_TO_CONFIRM','10064');
 define('IGNORE_ID_KARTOTEKA', '20651'); //ignore certain files, e.g. transport costs
+define('DEFAULT_DELIVERY_POINT_ILN', '5900009917529');
 ?>

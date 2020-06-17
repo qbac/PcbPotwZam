@@ -11,6 +11,7 @@ class OrdersFromCustomers {
     private $totalLines = 0;
     private $lpPozConfirmed = '';
     private $nrDokWew ='';
+    private $defaultDeliveryPointIln = DEFAULT_DELIVERY_POINT_ILN;
     public $locationXmlFile = LOCATION_XML_FILES ;
     public $data = array();
     public $XmlData;
@@ -76,11 +77,10 @@ class OrdersFromCustomers {
         $this->data['OrderResponse-Parties']['Seller']['CityName'] = $result[0]['MIEJSCOWOSC'];
         $this->data['OrderResponse-Parties']['Seller']['PostCode'] = $result[0]['KODPOCZTOWY'];
         $this->data['OrderResponse-Parties']['Seller']['Country'] = $result[0]['KODKRAJU'];
-        $this->addToXmlData($this->data, $this->XmlData);
     }
 
     public function getDeliveryPoint() {
-        $this->data['OrderResponse-Parties']['DeliveryPoint']= ' ';
+        $this->data['OrderResponse-Parties']['DeliveryPoint']['ILN']= $this->defaultDeliveryPointIln;
     }
 
     private function getOrdersToConfirmed () {
@@ -121,7 +121,7 @@ class OrdersFromCustomers {
     $stmt->execute();
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if ($result) {
-        $data['OrderResponse-Lines']['Line'] = array();    
+        $data['OrderResponse-Lines']= array();    
     foreach ($result as $value)
         {
             // $data['OrderResponse-Lines']['Line']['Line-Item']['LineNumber'] = $value["LP"];
@@ -132,15 +132,15 @@ class OrdersFromCustomers {
             // $data['OrderResponse-Lines']['Line']['Line-Item']['OrderedUnitNetPrice'] = $value["CENANETTO"];
             // $data['OrderResponse-Lines']['Line']['Line-Item']['ExpectedDeliveryDate'] = $value["TERMINDOST"];
 
-            $dataLine['LineNumber'] = $value["LP"];
-            $dataLine['SupplierItemCode'] = $value["INDEKS"];
-            $dataLine['OrderedQuantity'] = $value["ILOSC"];
-            $dataLine['QuantityToBeDelivered'] = $value["ILOSC"];
-            $dataLine['UnitOfMeasure'] = Schema::$jm[$value["JM"]];
-            $dataLine['OrderedUnitNetPrice'] = $value["CENANETTO"];
-            $dataLine['ExpectedDeliveryDate'] = $value["TERMINDOST"];
+            $dataLine['Line-Item']['LineNumber'] = $value["LP"];
+            $dataLine['Line-Item']['SupplierItemCode'] = $value["INDEKS"];
+            $dataLine['Line-Item']['OrderedQuantity'] = number_format($value["ILOSC"],3);
+            $dataLine['Line-Item']['QuantityToBeDelivered'] = number_format($value["ILOSC"],3);
+            $dataLine['Line-Item']['UnitOfMeasure'] = Schema::$jm[$value["JM"]];
+            $dataLine['Line-Item']['OrderedUnitNetPrice'] = number_format($value["CENANETTO"],2);
+            $dataLine['Line-Item']['ExpectedDeliveryDate'] = $value["TERMINDOST"];
             
-            array_push($data['OrderResponse-Lines']['Line'],$dataLine);
+            array_push($data['OrderResponse-Lines'],$dataLine);
             $this->lpPozConfirmed = $this->lpPozConfirmed.' '.$value["LP"];
             
                 $query = "UPDATE pozzamwsp pzs SET pzs.datawysylki = '{$value["TERMINDOST"]}' WHERE pzs.id_poz={$value["ID_POZ"]}";
@@ -191,7 +191,7 @@ class OrdersFromCustomers {
         foreach( $data as $key => $value ) {
             if( is_array($value) ) {
                 if( is_numeric($key) ){
-                    $key = 'Line-Item';
+                    $key = 'Line';
                 }
                 $subnode = $xml_data->addChild($key);
                 $this->addToXmlData($value, $subnode);
@@ -219,13 +219,14 @@ class OrdersFromCustomers {
                 $this->getHeaderOrder($value["ID_NAGL"]);
                 $this->getBuyer($value["ID_NAGL"]);
                 $this->getSeller();
-                //$this->getDeliveryPoint();
+                $this->getDeliveryPoint();
+                $this->addToXmlData($this->data, $this->XmlData);
                 $this->getPositionToConfirmed($value["ID_NAGL"]);
                 $this->getTotalLines($this->totalLines);
                 if ($this->totalLines > 0) {
                     $fileName = $this->generateXmlFile($value["ID_NAGL"]);
                     $this->setLogConfirmed($value["ID_NAGL"],1, "Lp: ".$this->lpPozConfirmed." Plik: ".$fileName);
-                    //$this->setStatusConfirmed($value["ID_NAGL"]);
+                    $this->setStatusConfirmed($value["ID_NAGL"]);
                 } else {
                     $this->setLogConfirmed($value["ID_NAGL"],2,'Brak pozycji do potwierdzenia');
                     $this->setStatusConfirmed($value["ID_NAGL"]);
