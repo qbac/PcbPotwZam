@@ -174,6 +174,38 @@ class OrdersFromCustomers {
         $stmt->execute();
     }
 
+    private function setStatusFailed ($idNagl) {
+        $query = "UPDATE WYSTCECHNAGL W Set W.WARTOSC = ''
+        Where (W.Id_Nagl = {$idNagl}) and (W.Id_CechaDokK = {$this->idCechaNaglConfirm})";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $query = "UPDATE NAGLDANE N Set ID_NAGL_PRIORYTET = 0
+        Where (N.Id_Nagl = {$idNagl})";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+    }
+
+    private function checkNotEditableOrder ($idNagl) {
+        try {
+            $query = "UPDATE NAGLZR set ID_NAGLZR=ID_NAGLZR where (ID_NAGL = {$idNagl})";
+            $this->conn->setAttribute(PDO::ATTR_AUTOCOMMIT, false);
+            $this->conn->exec("SET TRANSACTION READ WRITE ISOLATION LEVEL READ COMMITTED NO WAIT");
+            
+              $stmt = $this->conn->prepare($query);
+              $stmt->execute();
+              $this->conn->exec("ROLLBACK"); //może też być rollback
+              $this->conn->setAttribute(PDO::ATTR_AUTOCOMMIT, true);
+              //echo "Dokument nie jest edytowany";
+              return TRUE;
+            } catch (Exception $e) {
+              $this->conn->exec("ROLLBACK");
+              //echo "Failed: " . $e->getMessage();
+              //echo "Dokument jest edytowany";
+              return FALSE;
+            }
+            
+    }
+
     private function setLogConfirmed ($idNagl, $idTresc, $trescLog = '') {
         $tresc[1]='Poprawnie wygenerowano potwierdzenie zamówienia';
         $tresc[2]='Błąd. Nie można wygenerować potwierdzenia zamówienia.';
@@ -214,30 +246,36 @@ class OrdersFromCustomers {
         if ($result) {
             foreach ($result as $value)
             {
-                $this->XmlData = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><Document-OrderResponse></Document-OrderResponse>');
-                echo "NAGŁÓWEK DOKUMENTU: ".$value["ID_NAGL"]."\n";
-                $this->getHeaderOrder($value["ID_NAGL"]);
-                $this->getBuyer($value["ID_NAGL"]);
-                $this->getSeller();
-                $this->getDeliveryPoint();
-                $this->addToXmlData($this->data, $this->XmlData);
-                $this->getPositionToConfirmed($value["ID_NAGL"]);
-                $this->getTotalLines($this->totalLines);
-                if ($this->totalLines > 0) {
-                    $fileName = $this->generateXmlFile($value["ID_NAGL"]);
-                    $this->setLogConfirmed($value["ID_NAGL"],1, "Lp: ".$this->lpPozConfirmed." Plik: ".$fileName);
-                    $this->setStatusConfirmed($value["ID_NAGL"]);
+                if( $this->checkNotEditableOrder($value["ID_NAGL"]) == TRUE)
+                {
+                    $this->XmlData = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><Document-OrderResponse></Document-OrderResponse>');
+                    echo "NAGŁÓWEK DOKUMENTU: ".$value["ID_NAGL"]."\n";
+                    $this->getHeaderOrder($value["ID_NAGL"]);
+                    $this->getBuyer($value["ID_NAGL"]);
+                    $this->getSeller();
+                    $this->getDeliveryPoint();
+                    $this->addToXmlData($this->data, $this->XmlData);
+                    $this->getPositionToConfirmed($value["ID_NAGL"]);
+                    $this->getTotalLines($this->totalLines);
+                    if ($this->totalLines > 0) {
+                        $fileName = $this->generateXmlFile($value["ID_NAGL"]);
+                        $this->setLogConfirmed($value["ID_NAGL"],1, "Lp: ".$this->lpPozConfirmed." Plik: ".$fileName);
+                        $this->setStatusConfirmed($value["ID_NAGL"]);
+                    } else {
+                        $this->setLogConfirmed($value["ID_NAGL"],2,'Brak pozycji do potwierdzenia');
+                        //$this->setStatusConfirmed($value["ID_NAGL"]);
+                        $this->setStatusFailed($value["ID_NAGL"]);
+                    }
+                    //$this->setStatusConfirmed();
+                    //$this->setLogConfirmed();
+                    //return $r;
+                    $this->XmlData = null;
+                    $this->totalLines = 0;
+                    $this->lpPozConfirmed = '';
+                    $this->nrDokWew = '';
                 } else {
-                    $this->setLogConfirmed($value["ID_NAGL"],2,'Brak pozycji do potwierdzenia');
-                    $this->setStatusConfirmed($value["ID_NAGL"]);
+                    echo "Dokument ".$value["ID_NAGL"]." jest edytowany";
                 }
-                //$this->setStatusConfirmed();
-                //$this->setLogConfirmed();
-                //return $r;
-                $this->XmlData = null;
-                $this->totalLines = 0;
-                $this->lpPozConfirmed = '';
-                $this->nrDokWew = '';
             }
         }
     }
