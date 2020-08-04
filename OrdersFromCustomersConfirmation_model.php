@@ -1,11 +1,12 @@
 <?php
 
 class OrdersFromCustomers {
-    
+
     private $idCechaNaglConfirm = ID_CECHA_NAGL_CONFIRM; //id header attributes Orders from recipients
     private $idGrupaDok = 80; // Group Orders from recipients
     private $toConfirmation = VALUE_CHECHA_NAGL_TO_CONFIRM;
     private $idPriorytetConfirmation = ID_NAGL_PRIORYTET_TO_CONFIRM;
+    private $idPriorytetOverdue = ID_NAGL_PRIORYTET_OVERDUE;
     private $idKontrahToConfirm = ID_KONTRAH_TO_CONFIRM;
     private $ignoreIdKartoteka = IGNORE_ID_KARTOTEKA;
     private $totalLines = 0;
@@ -36,11 +37,10 @@ class OrdersFromCustomers {
 
     public function getBuyer($idNagl) {
         $query = "select DK.id_danekontrah, K.globalnrlokaliz, DK.nazwadl, DK.kodpocztowy, DK.ulica, DK.nrdomu, DK.nrlokalu, DK.miejscowosc, KR.kodkraju FROM nagl n
-        LEFT OUTER JOIN KONTRAH K ON (N.ID_KONTRAH = K.ID_KONTRAH)  
+        LEFT OUTER JOIN KONTRAH K ON (N.ID_KONTRAH = K.ID_KONTRAH)
         LEFT OUTER JOIN DANEKONTRAH DK ON (N.ID_DANEKONTRAH = DK.ID_DANEKONTRAH)
         LEFT OUTER join kraj KR ON (DK.id_kraj = kr.id_kraj)
         WHERE n.id_nagl='{$idNagl}'";
-        
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -62,7 +62,6 @@ class OrdersFromCustomers {
         $query = "select FIRST 1 df.globalnrlokaliz, df.nazwa_firmy, Df.kodpocztowy, Df.ulica, Df.nrdomu, Df.nrlokalu, Df.miejscowosc, kr.kodkraju
         FROM danefirmy df
         LEFT OUTER join kraj KR ON (Df.id_kraj = kr.id_kraj)";
-        
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -91,12 +90,11 @@ class OrdersFromCustomers {
         inner JOIN NAGL NA ON (WC.id_nagl = NA.id_nagl)
         LEFT JOIN NAGLDANE ND ON (WC.id_nagl = ND.id_nagl)
         WHERE
-        WC.id_cechadokk = {$this->idCechaNaglConfirm} 
+        WC.id_cechadokk = {$this->idCechaNaglConfirm}
         AND NA.id_grupadok = {$this->idGrupaDok}
         AND NA.ID_KONTRAH = {$this->idKontrahToConfirm}
         AND ((WC.wartosc = '{$this->toConfirmation}') OR (ND.ID_NAGL_PRIORYTET = {$this->idPriorytetConfirmation}))
         AND NA.status = 0";
-        
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -116,12 +114,11 @@ class OrdersFromCustomers {
     if($this->ignoreIdKartoteka <>''){
         $query .= " AND p.id_kartoteka not in ({$this->ignoreIdKartoteka})";
     }
-    
     $stmt = $this->conn->prepare($query);
     $stmt->execute();
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if ($result) {
-        $data['OrderResponse-Lines']= array();    
+        $data['OrderResponse-Lines']= array();
     foreach ($result as $value)
         {
             // $data['OrderResponse-Lines']['Line']['Line-Item']['LineNumber'] = $value["LP"];
@@ -139,10 +136,8 @@ class OrdersFromCustomers {
             $dataLine['Line-Item']['UnitOfMeasure'] = Schema::$jm[$value["JM"]];
             $dataLine['Line-Item']['OrderedUnitNetPrice'] = number_format($value["CENANETTO"],2);
             $dataLine['Line-Item']['ExpectedDeliveryDate'] = $value["TERMINDOST"];
-            
             array_push($data['OrderResponse-Lines'],$dataLine);
             $this->lpPozConfirmed = $this->lpPozConfirmed.' '.$value["LP"];
-            
                 $query = "UPDATE pozzamwsp pzs SET pzs.datawysylki = '{$value["TERMINDOST"]}' WHERE pzs.id_poz={$value["ID_POZ"]}";
                 $stmt = $this->conn->prepare($query);
                 $stmt->execute();
@@ -185,36 +180,37 @@ class OrdersFromCustomers {
         $stmt->execute();
     }
 
+    /**
+    * @param integer $idNagl id document header
+    * @return boolean TRUE if you can process the document,
+    *                 | FALSE if the document cannot be processed
+    */
     private function checkNotEditableOrder ($idNagl) {
         try {
             $query = "UPDATE NAGLZR set ID_NAGLZR=ID_NAGLZR where (ID_NAGL = {$idNagl})";
             $this->conn->setAttribute(PDO::ATTR_AUTOCOMMIT, false);
             $this->conn->exec("SET TRANSACTION READ WRITE ISOLATION LEVEL READ COMMITTED NO WAIT");
-            
               $stmt = $this->conn->prepare($query);
               $stmt->execute();
-              $this->conn->exec("ROLLBACK"); //może też być rollback
+              $this->conn->exec("ROLLBACK");
               $this->conn->setAttribute(PDO::ATTR_AUTOCOMMIT, true);
-              //echo "Dokument nie jest edytowany";
               return TRUE;
             } catch (Exception $e) {
               $this->conn->exec("ROLLBACK");
-              //echo "Failed: " . $e->getMessage();
-              //echo "Dokument jest edytowany";
               return FALSE;
             }
-            
     }
 
     private function setLogConfirmed ($idNagl, $idTresc, $trescLog = '') {
         $tresc[1]='Poprawnie wygenerowano potwierdzenie zamówienia';
         $tresc[2]='Błąd. Nie można wygenerować potwierdzenia zamówienia.';
+        $tresc[3]='Błąd. Dokument aktualnie jest edytowany. Nie można wygenerować potwierdzenia zamówienia.';
         if ($idTresc == 0) {
             $query = "EXECUTE PROCEDURE rejestroper_add(136,1,{$idNagl},'{$trescLog}')";
         }else {
             $tr = $tresc[$idTresc].' '.$trescLog;
             $query = "EXECUTE PROCEDURE rejestroper_add(136,1,{$idNagl},'{$tr}')";
-        }       
+        }
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
     }
@@ -266,18 +262,37 @@ class OrdersFromCustomers {
                         //$this->setStatusConfirmed($value["ID_NAGL"]);
                         $this->setStatusFailed($value["ID_NAGL"]);
                     }
-                    //$this->setStatusConfirmed();
-                    //$this->setLogConfirmed();
-                    //return $r;
                     $this->XmlData = null;
                     $this->totalLines = 0;
                     $this->lpPozConfirmed = '';
                     $this->nrDokWew = '';
                 } else {
-                    echo "Dokument ".$value["ID_NAGL"]." jest edytowany";
+                    $this->setLogConfirmed($value["ID_NAGL"],3,'');
                 }
             }
         }
+    }
+
+    public function checkOverdueOrders(){
+        $this->getOverdueOrders();
+    }
+
+    private function getOverdueOrders() {
+        $query="SELECT WC.ID_NAGL
+        FROM WYSTCECHNAGL WC
+        INNER JOIN CECHADOKK CD  ON (WC.ID_CECHADOKK = CD.ID_CECHADOKK)
+        inner JOIN NAGL NA ON (WC.id_nagl = NA.id_nagl)
+        LEFT JOIN NAGLDANE ND ON (WC.id_nagl = ND.id_nagl)
+        WHERE
+        WC.id_cechadokk = {$this->idCechaNaglConfirm}
+        AND NA.id_grupadok = {$this->idGrupaDok}
+        AND NA.ID_KONTRAH = {$this->idKontrahToConfirm}
+        AND ((WC.wartosc = 'Potwierdzone') AND (ND.ID_NAGL_PRIORYTET not in ({$this->idPriorytetOverdue})))
+        AND NA.status = 0";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $result;
     }
 }
 
